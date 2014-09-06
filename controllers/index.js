@@ -1,3 +1,4 @@
+// Modules
 var SkiArea = require('../models/skiArea.js');
 var cheerio = require('cheerio');
 var request = require("request");
@@ -6,12 +7,12 @@ var mongoose = require('mongoose');
 mongoose.connect('mongodb://localhost/USSkiAreas');
 
 
-
+// Exports
 module.exports = {loadSkiAreas:loadSkiAreas};
 
 
 // This function populates a mongo database of ski areas and also res.send's the entire database to the browser.  
-
+// The console.log statements should be left in, as they will help catch problems that may occur if Wikipedia changes format.
 function loadSkiAreas(req,res){
 	var listURL = 'https://en.wikipedia.org/wiki/List_of_ski_areas_and_resorts_in_the_United_States';
 	// Get the list of Colorado ski Areas and their wikipedia page urls:
@@ -35,33 +36,19 @@ function loadSkiAreas(req,res){
 					skiAreas.push({'name':USSkiAreaAnchors.eq(i).text(), 
 						'wikiURL':'https://en.wikipedia.org'+USSkiAreaAnchors.eq(i).attr('href') } )
 				}
-				else console.log("no wikipedia page for: ", USSkiAreaAnchors.eq(i).text() );
+				else console.log("No wikipedia page for: ", USSkiAreaAnchors.eq(i).text() );
 			};
 			console.log('Number of irrelevant anchors:', badAnchors);
 		
-			console.log("number of skiAreas with wikipedia entries: ", skiAreas.length)
-			// Asynchronous mapping to get the wiki page for each ski area:
+			console.log("Number of skiAreas with wikipedia entries: ", skiAreas.length)
+			// Parallel async call to get the wiki page for each ski area:
 			async.map(skiAreas, getSkiPage, function(err,results){
 					for (var i = 0; i < skiAreas.length; i++) {
 						skiAreas[i] = skiScraper(skiAreas[i],results[i]);
 					};
-					//console.log(skiAreas)
-					res.send(skiAreas)
-					console.log(skiAreas.length)
-					howManyWithKey(skiAreas,"name")
-					howManyWithKey(skiAreas,"wikiURL")
-					howManyWithKey(skiAreas,"website")
-					howManyWithKey(skiAreas,"state")
-					howManyWithKey(skiAreas,"yearlySnowfall")
-					howManyWithKey(skiAreas,"runs")
-					howManyWithKey(skiAreas,"top")
-					howManyWithKey(skiAreas,"base")
-					howManyWithKey(skiAreas,"vertical")
-					howManyWithKey(skiAreas,"beginner")
-					howManyWithKey(skiAreas,"intermediate")
-					howManyWithKey(skiAreas,"advanced")
-					howManyWithKey(skiAreas,"expert")
-
+					res.send(skiAreas);
+					// Log the stats to terminal
+					logSkiAreaListNumbers(skiAreas)
 					// Asyncronous mapping to save ski areas to database
 					async.map(skiAreas, storeSkiArea,
 						function(err,results){
@@ -250,13 +237,16 @@ function listByKeyAndValue(skiAreas,key,value){
 	console.log("Areas with "+key+" = "+value, skiAreas.filter(function(area){return area[key]===value}))
 }
 
+function logSkiAreaListNumbers(skiAreas){
+	var keys = ["name", "wikiURL", "website", "yearlySnowfall", "skiableAcres","runs", "beginner", "intermediate", "advanced", "expert", "vertical", "top", "base"]
+	for(var i in keys){
+		howManyWithKey(skiAreas,keys[i]);
+	}
+}
 
-
-
-
-	/* Notes on async.map:
-	1. Syntax: async.map(myArray,iterator,callback2)
-	2. iterator(item, callback1) - A function to apply to each item in arr. The iterator is passed a callback(err, transformed) which must be called once it has completed with an error (which can be null) and a transformed item.
-	3. But callback1(err,transformed) is determined by async.  Nonetheless, you must include something in your iterator that triggers it, because async is listening for that.
-	4. callback2(err, results) - A callback which is called when all iterator functions have finished, or an error occurs. Results is an array of the transformed items from the arr.
-	*/
+/* 
+async.map syntax: async.map(myArray,iterator,callback2)
+1. iterator(item, callback1) - A function to apply to each item in arr. The iterator is passed a callback(err, transformed) which must be called once it has completed with an error (which can be null) and a transformed item.
+2. callback1(err,transformed) is determined by async.  Nonetheless, you must include something in your iterator that triggers it, because async is listening for that.
+3. callback2(err, results) - A callback which is called when all iterator functions have finished, or an error occurs. Results is an array of the transformed items from the arr.
+*/
